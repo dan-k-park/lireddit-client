@@ -17,9 +17,9 @@ const Register: React.FC<registerProps> = ({}) => {
   return (
     <Wrapper variant="small">
       <Formik
-        initialValues={{ username: "", password: "" }}
+        initialValues={{ email: "", username: "", password: "" }}
         onSubmit={async (values, { setErrors }) => {
-          const response = await register(values);
+          const response = await register({ options: values });
           if (response.data?.register.errors) {
             // don't need ? after data because ts will infer that it's defined
             // since it's within an if statement
@@ -37,6 +37,9 @@ const Register: React.FC<registerProps> = ({}) => {
               label="username"
             />
             <Box mt={4}>
+              <InputField name="email" placeholder="email" label="email" />
+            </Box>
+            <Box mt={4}>
               <InputField
                 name="password"
                 placeholder="password"
@@ -44,6 +47,7 @@ const Register: React.FC<registerProps> = ({}) => {
                 type="password"
               />
             </Box>
+
             <Button
               mt={4}
               type="submit"
