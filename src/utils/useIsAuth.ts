@@ -9,7 +9,7 @@ export const useIsAuth = () => {
     // takes a bit of time to fetch the data
     // don't want a logged in user to get redirected while mequery is fetching data
     if (!fetching && !data?.me) {
-      router.replace("/login");
+      router.replace("/login?next=" + router.pathname);
     }
   }, [fetching, data, router]);
 };
