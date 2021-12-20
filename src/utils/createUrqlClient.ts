@@ -1,7 +1,7 @@
 import { dedupExchange, fetchExchange } from "@urql/core";
-import { cacheExchange } from "@urql/exchange-graphcache";
+import { cacheExchange, Resolver } from "@urql/exchange-graphcache";
 import Router from "next/router";
-import { Exchange } from "urql";
+import { Exchange, stringifyVariables } from "urql";
 import { pipe, tap } from "wonka";
 import {
   LoginMutation,
@@ -27,6 +27,90 @@ const errorExchange: Exchange =
     );
   };
 
+const cursorPagination = (): Resolver => {
+  // fieldArgs were passed in from the variables state in index.tsx
+  return (_parent, fieldArgs, cache, info) => {
+    const { parentKey: entityKey, fieldName } = info;
+    // get all the fields in the cache that are under the query
+    // all the fields in the cache
+    const allFields = cache.inspectFields(entityKey);
+    console.log("all fields: ", allFields);
+    const fieldInfos = allFields.filter((info) => info.fieldName === fieldName);
+    const size = fieldInfos.length;
+    // no data
+    // cache miss
+    if (size === 0) {
+      return undefined;
+    }
+    const fieldKey = `${fieldName}(${stringifyVariables(fieldArgs)})`;
+
+    // will be null when clicking load more
+    const isItInTheCache = cache.resolve(entityKey, fieldKey);
+    // if nothing in the cache, then partial return
+    info.partial = !isItInTheCache;
+    const results: string[] = [];
+    fieldInfos.forEach((info) => {
+      const data = cache.resolve(entityKey, info.fieldKey) as string[];
+      console.log(data);
+      results.push(...data);
+    });
+
+    return results;
+
+    // const visited = new Set();
+    // let result: NullArray<string> = [];
+    // let prevOffset: number | null = null;
+
+    // for (let i = 0; i < size; i++) {
+    //   const { fieldKey, arguments: args } = fieldInfos[i];
+    //   if (args === null || !compareArgs(fieldArgs, args)) {
+    //     continue;
+    //   }
+
+    //   const links = cache.resolveFieldByKey(entityKey, fieldKey) as string[];
+    //   const currentOffset = args[offsetArgument];
+
+    //   if (
+    //     links === null ||
+    //     links.length === 0 ||
+    //     typeof currentOffset !== "number"
+    //   ) {
+    //     continue;
+    //   }
+
+    //   if (!prevOffset || currentOffset > prevOffset) {
+    //     for (let j = 0; j < links.length; j++) {
+    //       const link = links[j];
+    //       if (visited.has(link)) continue;
+    //       result.push(link);
+    //       visited.add(link);
+    //     }
+    //   } else {
+    //       const tempResult: NullArray<string> = [];
+    //       for (let j = 0; j < links.length; j++) {
+    //         const link = links[j];
+    //         if (visited.has(link)) continue;
+    //         tempResult.push(link);
+    //         visited.add(link);
+    //       }
+    //       result = [...tempResult, ...result];
+    //     }
+
+    //     prevOffset = currentOffset;
+    //   }
+
+    //   const hasCurrentPage = cache.resolve(entityKey, fieldName, fieldArgs);
+    //   if (hasCurrentPage) {
+    //     return result;
+    //   } else if (!(info as any).store.schema) {
+    //     return undefined;
+    //   } else {
+    //     info.partial = true;
+    //     return result;
+    //   }
+  };
+};
+
 export const createUrqlClient = (ssrExchange: any) => ({
   url: "http://localhost:4000/graphql",
   fetchOptions: {
@@ -35,6 +119,11 @@ export const createUrqlClient = (ssrExchange: any) => ({
   exchanges: [
     dedupExchange,
     cacheExchange({
+      resolvers: {
+        Query: {
+          posts: cursorPagination(),
+        },
+      },
       updates: {
         Mutation: {
           logout: (_result, args, cache, info) => {
