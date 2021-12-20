@@ -32,9 +32,11 @@ const cursorPagination = (): Resolver => {
   return (_parent, fieldArgs, cache, info) => {
     const { parentKey: entityKey, fieldName } = info;
     // get all the fields in the cache that are under the query
-    // all the fields in the cache
+    // all the queries in the cache
     const allFields = cache.inspectFields(entityKey);
     console.log("all fields: ", allFields);
+    // allfields will have me query because of navbar?
+    // that's why we're filtering by posts
     const fieldInfos = allFields.filter((info) => info.fieldName === fieldName);
     const size = fieldInfos.length;
     // no data
@@ -44,7 +46,9 @@ const cursorPagination = (): Resolver => {
     }
     const fieldKey = `${fieldName}(${stringifyVariables(fieldArgs)})`;
 
-    // will be null when clicking load more
+    // will be null when clicking load more because we're telling urql we got a partial return from the cache
+    // that is the initial 10 posts
+    // fetch more data then combine it in the results.push(...data) on line 59
     const isItInTheCache = cache.resolve(entityKey, fieldKey);
     // if nothing in the cache, then partial return
     info.partial = !isItInTheCache;
@@ -119,6 +123,8 @@ export const createUrqlClient = (ssrExchange: any) => ({
   exchanges: [
     dedupExchange,
     cacheExchange({
+      // like client side resolvers
+      // run whenever query is run
       resolvers: {
         Query: {
           posts: cursorPagination(),
