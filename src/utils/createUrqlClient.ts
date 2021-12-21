@@ -1,3 +1,4 @@
+import { PaginatedPosts } from "./../generated/graphql";
 import { dedupExchange, fetchExchange } from "@urql/core";
 import { cacheExchange, Resolver } from "@urql/exchange-graphcache";
 import Router from "next/router";
@@ -34,7 +35,7 @@ const cursorPagination = (): Resolver => {
     // get all the fields in the cache that are under the query
     // all the queries in the cache
     const allFields = cache.inspectFields(entityKey);
-    console.log("all fields: ", allFields);
+    // console.log("all fields: ", allFields);
     // allfields will have me query because of navbar?
     // that's why we're filtering by posts
     const fieldInfos = allFields.filter((info) => info.fieldName === fieldName);
@@ -49,17 +50,33 @@ const cursorPagination = (): Resolver => {
     // will be null when clicking load more because we're telling urql we got a partial return from the cache
     // that is the initial 10 posts
     // fetch more data then combine it in the results.push(...data) on line 59
-    const isItInTheCache = cache.resolve(entityKey, fieldKey);
+    const isItInTheCache = cache.resolve(
+      cache.resolve(entityKey, fieldKey) as string,
+      "posts"
+    );
     // if nothing in the cache, then partial return
     info.partial = !isItInTheCache;
+    let hasMore = true;
     const results: string[] = [];
     fieldInfos.forEach((info) => {
-      const data = cache.resolve(entityKey, info.fieldKey) as string[];
-      console.log(data);
+      // there has to be a better way to do this...
+      const key = cache.resolve(entityKey, info.fieldKey) as string;
+      const data = cache.resolve(key, "posts") as string[];
+      const _hasMore = cache.resolve(key, "hasMore");
+      // loop through all of the cache going through all queries
+      // if any have hasMore as false then set hasMore as false
+      if (!_hasMore) {
+        hasMore = _hasMore as boolean;
+      }
+      // console.log("data: ", hasMore, data);
       results.push(...data);
     });
 
-    return results;
+    return {
+      __typename: "PaginatedPosts",
+      hasMore,
+      posts: results,
+    };
 
     // const visited = new Set();
     // let result: NullArray<string> = [];
@@ -123,6 +140,12 @@ export const createUrqlClient = (ssrExchange: any) => ({
   exchanges: [
     dedupExchange,
     cacheExchange({
+      // paginatedposts is a type we created but there's no id on that field
+      // this is telling urql there is not id
+      // alternatively if there's a different name for the id then that goes here
+      keys: {
+        PaginatedPosts: () => null,
+      },
       // like client side resolvers
       // run whenever query is run
       resolvers: {
