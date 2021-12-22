@@ -5,18 +5,11 @@ import React from "react";
 import { Layout } from "../../components/Layout";
 import { usePostQuery } from "../../generated/graphql";
 import { createUrqlClient } from "../../utils/createUrqlClient";
+import { useGetPostFromUrl } from "../../utils/useGetPostFromUrl";
 
 const Post = ({}) => {
-  const router = useRouter();
-  const intId =
-    typeof router.query.id === "string" ? parseInt(router.query.id) : -1;
-  const [{ data, error, fetching }] = usePostQuery({
-    // don't bother sending a request to the server if a bad id of -1 (impossible id) comes in
-    pause: intId === -1,
-    variables: {
-      id: intId,
-    },
-  });
+  const [{ data, error, fetching }] = useGetPostFromUrl();
+
   if (fetching) {
     return (
       <Layout>
