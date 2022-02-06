@@ -4,22 +4,22 @@ import NextLink from "next/link";
 import React from "react";
 import { useLogoutMutation, useMeQuery } from "../generated/graphql";
 import { isServer } from "../utils/isServer";
-import { useRouter } from "next/router";
+import { useApolloClient } from "@apollo/client";
 
 interface NavBarProps {}
 
 export const NavBar: React.FC<NavBarProps> = ({}) => {
-  const router = useRouter();
-  const [{ fetching: logoutFetching }, logout] = useLogoutMutation();
+  const [logout, { loading: logoutFetching }] = useLogoutMutation();
+  const apolloClient = useApolloClient();
   // because ssr is set to true on index.tsx where navbar is being rendered
   // a request is made to nextjs server which doesn't have a cookie
   // this is an extra request to nextjs server every time index.tsx is ssr'd to get the user which is null
-  const [{ data, fetching }] = useMeQuery({
-    pause: isServer(),
+  const { data, loading } = useMeQuery({
+    skip: isServer(),
   });
   let body = null;
 
-  if (fetching) {
+  if (loading) {
     // data loading
   } else if (!data?.me) {
     // not logged in
@@ -47,7 +47,8 @@ export const NavBar: React.FC<NavBarProps> = ({}) => {
           variant="link"
           onClick={async () => {
             await logout();
-            router.reload();
+            // without reloading the page it resets the cache
+            await apolloClient.resetStore();
           }}
           isLoading={logoutFetching}
         >

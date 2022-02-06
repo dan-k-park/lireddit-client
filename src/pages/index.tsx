@@ -1,25 +1,25 @@
 import { Box, Flex, Link, Stack } from "@chakra-ui/layout";
 import { Button, Heading, Text } from "@chakra-ui/react";
-import { withUrqlClient } from "next-urql";
 import NextLink from "next/link";
-import React, { useState } from "react";
+import React from "react";
 import { EditDeletePostButtons } from "../components/EditDeletePostButtons";
 import { Layout } from "../components/Layout";
 import { UpbootSection } from "../components/UpbootSection";
-import { usePostsQuery } from "../generated/graphql";
-import { createUrqlClient } from "../utils/createUrqlClient";
+import { usePostsQuery, PostsQuery } from "../generated/graphql";
+import { withApollo } from "../utils/withApollo";
 
 const Index = () => {
-  const [variables, setVariables] = useState({
-    limit: 15,
-    cursor: null as null | string,
+  const { data, error, loading, fetchMore, variables } = usePostsQuery({
+    variables: {
+      limit: 15,
+      cursor: null,
+    },
+    // for loading indicator on load more button
+    notifyOnNetworkStatusChange: true,
   });
-  const [{ data, error, fetching }] = usePostsQuery({
-    variables,
-  });
-  // console.log(fetching, other);
+  // console.log(loading, other);
 
-  if (!fetching && !data) {
+  if (!loading && !data) {
     return (
       <div>
         <div>query failed for some reason</div>
@@ -29,7 +29,7 @@ const Index = () => {
   }
   return (
     <Layout>
-      {!data && fetching ? (
+      {!data && loading ? (
         <div>loading...</div>
       ) : (
         <Stack spacing={8}>
@@ -66,15 +66,37 @@ const Index = () => {
         <Flex>
           <Button
             onClick={() => {
-              setVariables({
-                limit: variables.limit,
-                // cursor is a createdAt field from posts
-                // setting it to last elements on the list
-                // get all elements after the last element
-                cursor: data.posts.posts[data.posts.posts.length - 1].createdAt,
+              fetchMore({
+                variables: {
+                  limit: variables?.limit,
+                  // cursor is a createdAt field from posts
+                  // setting it to last elements on the list
+                  // get all elements after the last element
+                  cursor:
+                    data.posts.posts[data.posts.posts.length - 1].createdAt,
+                },
+                updateQuery: (
+                  previousValue,
+                  { fetchMoreResult }
+                ): PostsQuery => {
+                  if (!fetchMoreResult) {
+                    return previousValue as PostsQuery;
+                  }
+                  return {
+                    __typename: "Query",
+                    posts: {
+                      __typename: "PaginatedPosts",
+                      hasMore: (fetchMoreResult as PostsQuery).posts.hasMore,
+                      posts: [
+                        ...(previousValue as PostsQuery).posts.posts,
+                        ...(fetchMoreResult as PostsQuery).posts.posts,
+                      ],
+                    },
+                  };
+                },
               });
             }}
-            isLoading={fetching}
+            isLoading={loading}
             m="auto"
             my={8}
           >
@@ -88,4 +110,4 @@ const Index = () => {
 
 // add ssr if doing a query on the page
 // and if that query is important to seo
-export default withUrqlClient(createUrqlClient, { ssr: true })(Index);
+export default withApollo({ ssr: true })(Index);
