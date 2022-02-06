@@ -164,7 +164,6 @@ export const createWithApollo = (ac) => {
 
               // getDataFromTree does not call componentWillUnmount
               // head side effect therefore need to be cleared manually
-              Head.rewind();
             }
           }
 
